@@ -10,4 +10,7 @@ D = node.And([AB_C, B, A])
 Root = node.Simple("Root", D)
 
 print(Root.dumps())
-print(Root.paths([(".", )]))
+
+paths = Root.paths([(".", )])
+for path in paths:
+    print(path)

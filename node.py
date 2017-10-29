@@ -50,15 +50,21 @@ class Complex(Node):
 
         return "({})".format(inner)
 
+    def __repr__(self):
+        return self.id()
+
     def to_json(self):
         return {
             "id": self.id(),
             "dep": self.children }
 
     def paths(self, acc):
-        """ super(), but only delegates to children without modifying """
+        updated = [
+            prefix + (self, )
+            for prefix in acc]
+
         return flatten([
-            child.paths(acc)
+            child.paths(updated)
             for child in self.children])
 
 
