@@ -1,5 +1,7 @@
 import json
 
+from utils import flatten
+
 
 class Node(object):
     def dumps(self):
@@ -28,13 +30,24 @@ class Simple(Node):
             "id": self.id(),
             "dep": self.dependency }
 
+    def paths(self, acc):
+        """ Get all possible paths from self to Nil.
+        FIXME: generators, check for circular lists
+        """
+        return self.dependency.paths([
+            prefix + (self.name, )
+            for prefix in acc])
 
-class And(Node):
+
+class Complex(Node):
     def __init__(self, children):
         self.children = children
 
     def id(self):
-        inner = " * ".join(child.id() for child in self.children)
+        inner = self.operator().join(
+            child.id()
+            for child in self.children)
+
         return "({})".format(inner)
 
     def to_json(self):
@@ -42,20 +55,23 @@ class And(Node):
             "id": self.id(),
             "dep": self.children }
 
-
-class Or(Node):
-    def __init__(self, children):
-        self.children = children
-
-    def id(self):
-        inner = " + ".join(child.id() for child in self.children)
-        return "({})".format(inner)
+    def paths(self, acc):
+        """ super(), but only delegates to children without modifying """
+        return flatten([
+            child.paths(acc)
+            for child in self.children])
 
 
-    def to_json(self):
-        return {
-            "id": self.id(),
-            "dep": self.children }
+class And(Complex):
+    @staticmethod
+    def operator():
+        return " * "
+
+
+class Or(Complex):
+    @staticmethod
+    def operator():
+        return " + "
 
 
 class Nil(Node):
@@ -66,3 +82,7 @@ class Nil(Node):
     @staticmethod
     def to_json():
         return None
+
+    @staticmethod
+    def paths(acc):
+        return acc
