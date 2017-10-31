@@ -1,10 +1,7 @@
-from itertools import chain
-
+import itertools
 
 def flatten(nested):
-    assert(len(nested) > 0)
-    constructor = type(nested[0])
-    return constructor(chain(*nested))
+    return itertools.chain(*nested)
 
 def trace(foo):
     def inner(*args, **kwargs):

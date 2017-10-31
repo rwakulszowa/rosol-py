@@ -1,22 +1,16 @@
 import node
+import path
 
 
 A = node.Simple("A", node.Nil)
-B = node.Simple("B", node.Nil)
+B = node.Simple("B", A)
 C = node.Simple("C", node.Nil)
-E = node.Simple("E", A)
-EC = node.Or([E, C])
-AB = node.And([A, B])
-AB_C = node.Or([AB, C])
-D = node.And([AB_C, B, A])
-Root = node.Simple("Root", D)
+B_C = node.Or([B, C])
+Root = node.Simple("Root", B_C)
 
 print(Root.dumps())
 
-paths = Root.paths([(".", )])
-for path in paths:
-    print(path)
+paths = Root.paths(path.Path.empty())
 
-resolved = Root.resolve(tuple())
-print(set([node.id() for node in resolved]))
-
+for p in paths:
+    print(p)

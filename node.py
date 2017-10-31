@@ -1,5 +1,6 @@
 import json
 
+from path import Path
 from utils import first, flatten
 
 
@@ -9,6 +10,12 @@ class Node(object):
             self,
             indent = 4,
             default = lambda n: n.to_json() if hasattr(n, "to_json") else n)
+
+    def __hash__(self):
+        return hash(self.id())
+
+    def __eq__(self, other):
+        return type(self) is type(other) and self.id() == other.id()
 
 
 class Simple(Node):
@@ -30,17 +37,16 @@ class Simple(Node):
             "id": self.id(),
             "dep": self.dependency }
 
-    def paths(self, acc):
+    def paths(self, prefix):
         """ Get all possible paths from self to Nil.
-        FIXME: generators, check for circular lists
+        FIXME: check for circular lists
         """
-        return self.dependency.paths([
-            prefix + (self.name, )
-            for prefix in acc])
+        return self.dependency.paths(
+            prefix.append(self))
 
-    def resolve(self, prefix):
+    def resolve(self, prefix):  #FIXME
         return self.dependency.resolve(
-            prefix + (self, ))
+            prefix.append(self))
 
 
 class Complex(Node):
@@ -62,33 +68,24 @@ class Complex(Node):
             "id": self.id(),
             "dep": self.children }
 
-    def paths(self, acc):
-        #TODO: move to `And` and `Or`; And should return a megapath, or should return multiple options; all of them should be generators
-        updated = [
-            prefix + (self, )
-            for prefix in acc]
-
-        return flatten([
-            child.paths(updated)
-            for child in self.children])
-
 
 class And(Complex):
     @staticmethod
     def operator():
         return " * "
 
+    def paths(self, prefix):
+        raise NotImplementedError  #FIXME
+
     def resolve(self, acc):
 
-        def _unsolvable(subpaths):
+        def _unsolvable(subpaths):  #FIXME: this is just wrong; do the check on Path, don't return None (return an empty generator instead / filter by solvable)
             return any(
                 path is None
                 for path in subpaths)
 
         def _get_suffix(total, prefix):
-            assert(
-                total[ : len(prefix)] == prefix)
-            return total[len(prefix) : ]
+            return total.suffix(prefix)
 
         sub = [
             child.resolve(acc)
@@ -101,15 +98,7 @@ class And(Complex):
                 _get_suffix(subpath, acc)
                 for subpath in sub]
 
-            #NOTE: it is probably guaranteed that suffixes don't contain `And` nodes
-            #NOTE: this method should probably return a list/set of nodes (packages? ids? something with all the dependency crap stripped) in all cases
-            #NOTE: acc should also probably be a list of simple nodes (a `Path`)
-            #NOTE: basically, all caching / conflict resolution checking is done on a Path of simple nodes, but all weird special cases are handled inside nodes (i.e. Or with multiple options and And with a megapath)
-            #NOTE: this should actually reuse the `paths` method: if an `And` node fails, it should try all other possible subpaths (coming from `Or` nodes)
             megapath = acc + flatten(suffixes)
-            #FIXME: this is actually wrong:
-            #TODO: conflict checking (`Path`)
-            #TODO: try all possible subpaths (`paths`)
             return megapath
 
 
@@ -118,6 +107,12 @@ class Or(Complex):
     @staticmethod
     def operator():
         return " + "
+
+    def paths(self, prefix):
+        return (
+            subpath
+            for child in self.children
+            for subpath in child.paths(prefix))
 
     def resolve(self, acc):
         return first(
@@ -137,8 +132,8 @@ class Nil(Node):
         return None
 
     @staticmethod
-    def paths(acc):
-        return acc
+    def paths(prefix):
+        yield prefix
 
     @staticmethod
     def resolve(prefix):
