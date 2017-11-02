@@ -1,7 +1,7 @@
 import json
 
 from path import Path
-from utils import first, flatten
+from utils import first, flatten, selections
 
 
 class Node(object):
@@ -44,7 +44,7 @@ class Simple(Node):
         return self.dependency.paths(
             prefix.append(self))
 
-    def resolve(self, prefix):  #FIXME
+    def resolve(self, prefix):  #FIXME - move to paths(); don't need a separate method for it (And.paths() will be inefficient otherwise)
         return self.dependency.resolve(
             prefix.append(self))
 
@@ -75,7 +75,21 @@ class And(Complex):
         return " * "
 
     def paths(self, prefix):
-        raise NotImplementedError  #FIXME
+
+        def megapath(prefix, suffixes):
+            elements = [prefix] + [
+                suffix - prefix
+                for suffix in suffixes]
+
+            return Path.chain(elements)
+
+        subpaths_per_child = [
+            child.paths(prefix)
+            for child in self.children]
+
+        return (
+            megapath(prefix, selection)
+            for selection in selections(subpaths_per_child))
 
     def resolve(self, acc):
 
