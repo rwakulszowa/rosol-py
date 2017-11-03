@@ -41,12 +41,11 @@ class Simple(Node):
         """ Get all possible paths from self to Nil.
         FIXME: check for circular lists
         """
-        return self.dependency.paths(
-            prefix.append(self))
-
-    def resolve(self, prefix):  #FIXME - move to paths(); don't need a separate method for it (And.paths() will be inefficient otherwise)
-        return self.dependency.resolve(
-            prefix.append(self))
+        return (
+            path
+            for path in self.dependency.paths(
+                prefix.append(self))
+            if path.solvable())
 
 
 class Complex(Node):
@@ -84,37 +83,20 @@ class And(Complex):
             return Path.chain(elements)
 
         subpaths_per_child = [
-            child.paths(prefix)
+            (
+                subpath
+                for subpath in child.paths(prefix)
+                if subpath.solvable())
             for child in self.children]
 
-        return (
+        megapaths = (
             megapath(prefix, selection)
             for selection in selections(subpaths_per_child))
 
-    def resolve(self, acc):
-
-        def _unsolvable(subpaths):  #FIXME: this is just wrong; do the check on Path, don't return None (return an empty generator instead / filter by solvable)
-            return any(
-                path is None
-                for path in subpaths)
-
-        def _get_suffix(total, prefix):
-            return total.suffix(prefix)
-
-        sub = [
-            child.resolve(acc)
-            for child in self.children]
-
-        if _unsolvable(sub):
-            return None
-        else:
-            suffixes = [
-                _get_suffix(subpath, acc)
-                for subpath in sub]
-
-            megapath = acc + flatten(suffixes)
-            return megapath
-
+        return (
+            megapath
+            for megapath in megapaths
+            if megapath.solvable())
 
 
 class Or(Complex):
@@ -126,14 +108,8 @@ class Or(Complex):
         return (
             subpath
             for child in self.children
-            for subpath in child.paths(prefix))
-
-    def resolve(self, acc):
-        return first(
-            (
-                child.resolve(acc)
-                for child in self.children),
-            lambda n: n is not None)
+            for subpath in child.paths(prefix)
+            if subpath.solvable())
 
 
 class Nil(Node):
@@ -148,7 +124,3 @@ class Nil(Node):
     @staticmethod
     def paths(prefix):
         yield prefix
-
-    @staticmethod
-    def resolve(prefix):
-        return prefix
