@@ -1,4 +1,6 @@
 import itertools
+import json
+
 
 def flatten(nested):
     """
@@ -48,4 +50,11 @@ def selections(sources):
             [head_element] + subresult
             for head_element in head
             for subresult in subresults]
+
+def dumps(obj):
+    return json.dumps(
+        obj,
+        indent = 4,
+        default = lambda n: n.to_json() if hasattr(n, "to_json") else n.__dict__)
+
 

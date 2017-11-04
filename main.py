@@ -1,4 +1,7 @@
+import json
+
 import node
+import package
 import path
 
 
@@ -17,3 +20,15 @@ paths = Root.paths(path.Path.empty())
 for p in paths:
     print(p)
 
+repo = package.Repository([
+    package.VersionedPackage("A", 1, []),
+    package.VersionedPackage("A", 2, []),
+    package.VersionedPackage(
+        "B",
+        1,
+        [
+            package.Set("A", [1, 2, 3]),
+            package.Range("B", 1, 3)])])
+
+print(repo.dumps())
+print(repo.get("A", 1))

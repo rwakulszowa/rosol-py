@@ -1,11 +1,12 @@
 import json
 
 from path import Path
-from utils import first, flatten, selections
+from utils import first, flatten, selections, dumps
 
 
 class Node(object):
     def dumps(self):
+        return dumps(self)
         return json.dumps(
             self,
             indent = 4,
