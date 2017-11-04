@@ -1,6 +1,12 @@
 import itertools
 
 def flatten(nested):
+    """
+    >>> list(flatten([]))
+    []
+    >>> list(flatten([ [1, 2], [3, 4] ]))
+    [1, 2, 3, 4]
+    """
     return itertools.chain(*nested)
 
 def trace(foo):
@@ -12,6 +18,12 @@ def trace(foo):
     return inner
 
 def first(it, test):
+    """
+    >>> first(
+    ...    [1,2,3],
+    ...    lambda x: x % 2 is 0)
+    2
+    """
     return next(
         el for el in it if test(el))
 
@@ -36,8 +48,4 @@ def selections(sources):
             [head_element] + subresult
             for head_element in head
             for subresult in subresults]
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
 

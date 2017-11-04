@@ -2,9 +2,9 @@ import node
 import path
 
 
-A = node.Simple("A", node.Nil)
+A = node.Simple("A")
 B = node.Simple("B", A)
-C = node.Simple("C", node.Nil)
+C = node.Simple("C")
 B_C = node.Or([B, C])
 D = node.Simple("D", B_C)
 AiD = node.And([A, D])

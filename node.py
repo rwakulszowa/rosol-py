@@ -20,17 +20,15 @@ class Node(object):
 
 class Simple(Node):
 
-    def __init__(self, name, dependency):
+    def __init__(self, name, dependency=None):
         self.name = name
-        self.dependency = dependency
+        self.dependency = dependency or Nil
 
     def id(self):
         return self.name
 
     def __repr__(self):
-        return "{}: {}".format(
-            self.id(),
-            self.dependency.id())
+        return self.id()
 
     def to_json(self):
         return {
@@ -40,6 +38,17 @@ class Simple(Node):
     def paths(self, prefix):
         """ Get all possible paths from self to Nil.
         FIXME: check for circular lists
+
+        >>> A = Simple("A")
+        >>> list(A.paths(Path.empty()))
+        [Path: (A,)]
+
+        >>> B = Simple("B", A)
+        >>> list(B.paths(Path.empty()))
+        [Path: (B, A)]
+
+        >>> list(B.paths(Path([A])))  # A present in prefix and dependencies
+        []
         """
         return (
             path
@@ -74,7 +83,16 @@ class And(Complex):
         return " * "
 
     def paths(self, prefix):
+        """
+        >>> A = Simple("A")
+        >>> B = Simple("B")
+        >>> node = And([A, B])
+        >>> list(node.paths(Path.empty()))
+        [Path: (A, B)]
 
+        >>> list(node.paths(Path([A])))  # A present in prefix
+        []
+        """
         def megapath(prefix, suffixes):
             elements = [prefix] + [
                 suffix - prefix
@@ -105,6 +123,15 @@ class Or(Complex):
         return " + "
 
     def paths(self, prefix):
+        """
+        >>> A, B, C = [Simple(x) for x in ("A", "B", "C")]
+        >>> node = Or([B, C])
+        >>> list(node.paths(Path([A])))
+        [Path: (A, B), Path: (A, C)]
+
+        >>> list(node.paths(Path([A, B])))  # B would cause a conflict, C is fine
+        [Path: (A, B, C)]
+        """
         return (
             subpath
             for child in self.children
