@@ -38,13 +38,32 @@ class Repository(object):
         else:
             return None
 
+    def get_hits(self, keys):
+        """
+        Same as `get`, but for a list of keys and with misses filtered out
+        """
+        got = (
+            self.get(*key)
+            for key in keys)
+
+        return (
+            pkg
+            for pkg in got
+            if pkg is not None)
+
 
 class VersionedPackage(object):
     def __init__(self, name, version, dependencies):
         self.name = name
         self.version = version
         self.dependencies = dependencies  # `*` dependencies
-    
+
+    def __repr__(self):
+        return "{}-{}: {}".format(
+            self.name,
+            self.version,
+            self.dependencies)
+
 
 class Dependency(object):
     def to_json(self):
@@ -52,16 +71,53 @@ class Dependency(object):
         d["kind"] = self.__class__.__name__
         return d
 
+    def resolve(self, repo):
+        """
+        Returns existing packages from a `repo` matching the precondition
+        >>> A1, A2, A3 = [
+        ...     VersionedPackage("A", num, [])
+        ...     for num in (1, 2, 3)]
+        >>> repo = Repository([A1, A2, A3])
+        >>> dep = Set("A", [1, 3])
+        >>> list(dep.resolve(repo)) == [A1, A3]
+        True
+        >>> dep = Range("A", 1, 2)
+        >>> list(dep.resolve(repo)) == [A1, A2]
+        True
+        """
+        return repo.get_hits(
+            self.keys())
+
 
 class Set(Dependency):
     def __init__(self, name, candidates):
         self.name = name
         self.candidates = candidates
 
+    def __repr__(self):
+        return "{}: {}".format(
+            self.name,
+            self.candidates)
 
+    def keys(self):
+        return [
+            (self.name, version)
+            for version in self.candidates]
+
+        
 class Range(Dependency):
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
         self.upper = upper
 
+    def __repr__(self):
+        return "{}: <{}, {}>".format(
+            self.name,
+            self.lower,
+            self.upper)
+
+    def keys(self):
+        return [
+            (self.name, version)
+            for version in range(self.lower, self.upper + 1)]

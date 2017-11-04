@@ -31,4 +31,9 @@ repo = package.Repository([
             package.Range("B", 1, 3)])])
 
 print(repo.dumps())
-print(repo.get("A", 1))
+
+B1 = repo.get("B", 1)
+
+print([
+    list(dep.resolve(repo))
+    for dep in B1.dependencies])
