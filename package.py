@@ -1,6 +1,7 @@
 from itertools import groupby
 import json
 
+import node
 from utils import dumps
 
 
@@ -59,10 +60,33 @@ class VersionedPackage(object):
         self.dependencies = dependencies  # `*` dependencies
 
     def __repr__(self):
-        return "{}-{}: {}".format(
-            self.name,
-            self.version,
+        return "{}: {}".format(
+            self.id(),
             self.dependencies)
+
+    def id(self):
+        return "{}-{}".format(
+            self.name,
+            self.version)
+
+    def into_node(self, repo):
+        """
+        Convert into a `Node`
+        >>> A1 = VersionedPackage("A", 1, [])
+        >>> B1 = VersionedPackage("B", 1, [Set("A", [1])])
+        >>> repo = Repository([A1, B1])
+        >>> A1.into_node(repo) == node.Simple("A-1")
+        True
+        >>> B1.into_node(repo) == node.Simple("B-1", node.And([node.Simple("A-1")]))
+        True
+        """
+        dep_node = node.And([
+            dep.into_node(repo)
+            for dep in self.dependencies])
+
+        return node.Simple(
+                self.id(),
+                dep_node)
 
 
 class Dependency(object):
@@ -87,6 +111,19 @@ class Dependency(object):
         """
         return repo.get_hits(
             self.keys())
+
+    def into_node(self, repo):
+        """
+        Convert into a `Node`
+        >>> A1 = VersionedPackage("A", 1, [])
+        >>> repo = Repository([A1])
+        >>> dep = Set("A", [1])
+        >>> dep.into_node(repo) == node.Or([node.Simple("A-1")])
+        True
+        """
+        return node.Or([
+            dep.into_node(repo)
+            for dep in self.resolve(repo)])
 
 
 class Set(Dependency):

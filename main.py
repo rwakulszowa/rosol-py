@@ -23,8 +23,9 @@ for p in paths:
 repo = package.Repository([
     package.VersionedPackage("A", 1, []),
     package.VersionedPackage("A", 2, []),
+    package.VersionedPackage("B", 1, []),
     package.VersionedPackage(
-        "B",
+        "C",
         1,
         [
             package.Set("A", [1, 2, 3]),
@@ -32,8 +33,7 @@ repo = package.Repository([
 
 print(repo.dumps())
 
-B1 = repo.get("B", 1)
+C1 = repo.get("C", 1)
 
-print([
-    list(dep.resolve(repo))
-    for dep in B1.dependencies])
+node = C1.into_node(repo)
+print(list(node.paths(path.Path.empty())))
