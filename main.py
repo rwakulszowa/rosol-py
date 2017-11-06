@@ -5,35 +5,19 @@ import package
 import path
 
 
-A = node.Simple("A")
-B = node.Simple("B", A)
-C = node.Simple("C")
-B_C = node.Or([B, C])
-D = node.Simple("D", B_C)
-AiD = node.And([A, D])
-Root = node.Simple("Root", AiD)
-
-print(Root.dumps())
-
-paths = Root.paths(path.Path.empty())
-
-for p in paths:
-    print(p)
-
 repo = package.Repository([
     package.VersionedPackage("A", 1, []),
-    package.VersionedPackage("A", 2, []),
-    package.VersionedPackage("B", 1, []),
-    package.VersionedPackage(
-        "C",
-        1,
-        [
-            package.Set("A", [1, 2, 3]),
-            package.Range("B", 1, 3)])])
+    package.VersionedPackage("B", 1, [package.Set("A", [1])]),
+    package.VersionedPackage("B", 2, []),
+    package.VersionedPackage("C", 1, [package.Set("B", [1, 2])]),
+    package.VersionedPackage("D", 1, [
+        package.Set("A", [1, 2]),
+        package.Set("C", [1])]),
+    package.VersionedPackage("Root", 1, [package.Set("D", [1])])])
+    
+Root = repo.get("Root", 1)
 
-print(repo.dumps())
+node = Root.into_node(repo)
 
-C1 = repo.get("C", 1)
-
-node = C1.into_node(repo)
-print(list(node.paths(path.Path.empty())))
+for path in node.paths(path.Path.empty()):
+    print(path)
