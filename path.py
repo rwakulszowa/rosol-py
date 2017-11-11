@@ -82,3 +82,6 @@ class Path(object):
 
     def length(self):
         return len(self.nodes)
+
+    def has(self, node):
+        return node in self.nodes
