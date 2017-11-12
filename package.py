@@ -72,6 +72,8 @@ class VersionedPackage(object):
     def into_node(self, repo):
         """
         Convert into a `Node`
+
+        Returns a `node.Simple` with a lazily resolvable `node.Dependency`
         >>> A1 = VersionedPackage("A", 1, [])
         >>> B1 = VersionedPackage("B", 1, [Set("A", [1])])
         >>> repo = Repository([A1, B1])
@@ -80,13 +82,15 @@ class VersionedPackage(object):
         >>> B1.into_node(repo) == node.Simple("B-1", node.And([node.Simple("A-1")]))
         True
         """
-        dep_node = node.And([
-            dep.into_node(repo)
-            for dep in self.dependencies])
+        def make_dependency_node():
+            # This wrapper makes the resolution lazy on Simple nodes
+            yield node.And(
+                dep.into_node(repo)
+                for dep in self.dependencies)
 
         return node.Simple(
-                self.id(),
-                dep_node)
+            self.id(),
+            node.Dependency(make_dependency_node()))
 
 
 class Dependency(object):
@@ -121,9 +125,9 @@ class Dependency(object):
         >>> dep.into_node(repo) == node.Or([node.Simple("A-1")])
         True
         """
-        return node.Or([
+        return node.Or(
             dep.into_node(repo)
-            for dep in self.resolve(repo)])
+            for dep in self.resolve(repo))
 
 
 class Set(Dependency):

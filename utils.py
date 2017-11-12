@@ -58,3 +58,10 @@ def dumps(obj):
         default = lambda n: n.to_json() if hasattr(n, "to_json") else n.__dict__)
 
 
+def make_gen(value):
+    """
+    >>> next(make_gen("xaxa"))
+    'xaxa'
+    """
+    #FIXME: there must be a better way to do this
+    yield value

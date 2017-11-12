@@ -1,7 +1,30 @@
 import json
 
 from path import Path
-from utils import first, flatten, selections, dumps
+from utils import first, flatten, selections, dumps, make_gen
+
+
+class Dependency(object):
+    def __init__(self, data_gen):
+        self.data_gen = data_gen
+        self._cached = None
+
+    def resolve(self):
+        if not self._cached:
+            self._cached = next(self.data_gen)
+        return self._cached
+
+    @classmethod
+    def make(cls, node):
+        return Dependency(
+            make_gen(node))
+
+
+class NilDependency(Dependency):
+
+    @staticmethod
+    def resolve():
+        return Nil
 
 
 class Node(object):
@@ -21,7 +44,7 @@ class Node(object):
         >>> list(A.paths(Path.empty()))
         [Path: (A,)]
 
-        >>> B = Simple("B", A)
+        >>> B = Simple("B", Dependency.make(A))
         >>> list(B.paths(Path.empty()))
         [Path: (B, A)]
 
@@ -61,7 +84,8 @@ class Simple(Node):
 
     def __init__(self, name, dependency=None):
         self.name = name
-        self.dependency = dependency or Nil
+        self.dependency = dependency or NilDependency
+
 
     def id(self):
         return self.name
@@ -91,12 +115,13 @@ class Simple(Node):
         circular = prefix.has(self)
         new_prefix = prefix.append(self)
 
-        return self.dependency.paths(new_prefix) if not circular else [new_prefix]
+        return self.dependency.resolve().paths(new_prefix) if not circular else [new_prefix]
 
 
 class Complex(Node):
     def __init__(self, children):
-        self.children = children
+        # Convert to a tuple in case it was passed an iterator
+        self.children = tuple(children)
 
     def id(self):
         inner = self.operator().join(
