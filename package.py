@@ -54,6 +54,8 @@ class Repository(object):
 
 
 class VersionedPackage(object):
+    NodeCls = node.Simple
+
     def __init__(self, name, version, dependencies):
         self.name = name
         self.version = version
@@ -88,7 +90,7 @@ class VersionedPackage(object):
                 dep.into_node(repo)
                 for dep in self.dependencies)
 
-        return node.Simple(
+        return self.NodeCls(
             self.id(),
             node.Dependency(make_dependency_node()))
 

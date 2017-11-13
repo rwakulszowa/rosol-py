@@ -28,24 +28,22 @@ class NilDependency(Dependency):
 
 
 class Node(object):
+    PathCls = Path
+
     def dumps(self):
         return dumps(self)
-        return json.dumps(
-            self,
-            indent = 4,
-            default = lambda n: n.to_json() if hasattr(n, "to_json") else n)
 
-    def paths(self, prefix):
+    def paths(self, prefix=None):
         """ Get all possible paths from self to Nil.
 
         Filters out unsolvable paths, doesn't hang on circular dependencies.
 
         >>> A = Simple("A")
-        >>> list(A.paths(Path.empty()))
+        >>> list(A.paths())
         [Path: (A,)]
 
         >>> B = Simple("B", Dependency.make(A))
-        >>> list(B.paths(Path.empty()))
+        >>> list(B.paths())
         [Path: (B, A)]
 
         >>> list(B.paths(Path([A])))  # A present in prefix and dependencies (this test depends on `Path`'s current behavior
@@ -53,7 +51,7 @@ class Node(object):
 
         >>> C = Simple("C")
         >>> node = And([A, C])
-        >>> list(node.paths(Path.empty()))
+        >>> list(node.paths())
         [Path: (A, C)]
 
         >>> list(node.paths(Path([A])))  # A present in prefix
@@ -68,6 +66,8 @@ class Node(object):
         [Path: (A, C, D)]
         """
         #TODO: check if prefix is solvable (if it makes sense)
+        prefix = prefix or self.PathCls.empty()
+
         return (
             path
             for path in self._subpaths(prefix)
@@ -194,7 +194,6 @@ class Or(Complex):
             subpath
             for child in self.children
             for subpath in child.paths(prefix))
-
 
 
 class Nil(Node):

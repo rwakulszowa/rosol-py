@@ -1,8 +1,6 @@
 import json
 
-import node
 import package
-import path
 
 
 repo = package.Repository([
@@ -22,5 +20,5 @@ Root = repo.get("Root", 1)
 
 node = Root.into_node(repo)
 
-for path in node.paths(path.Path.empty()):
+for path in node.paths():
     print(path)
