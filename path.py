@@ -4,6 +4,9 @@ from utils import flatten
 
 class Path(object):
     """A wrapper around a tuple of Simple nodes, with some utility methods"""
+
+    IdentCls = ident.Simple
+
     def __init__(self, nodes):
         self.nodes = tuple(nodes)
 
@@ -72,14 +75,12 @@ class Path(object):
 
     def solvable(self):
         """
-        NOTE: Should be overwritten for proper use.
-        This one only checks for uniqueness for demonstration purposes
         >>> Path([1, 2]).solvable()
         True
         >>> Path([1, 2, 1]).solvable()
         False
         """
-        return len(self.nodes) == len(set(self.nodes)) 
+        return not self.IdentCls.are_conflicting(self.nodes)
 
     def length(self):
         return len(self.nodes)

@@ -1,5 +1,6 @@
 import json
 
+import ident
 from path import Path
 from utils import first, flatten, selections, dumps, make_gen
 
@@ -29,6 +30,7 @@ class NilDependency(Dependency):
 
 class Node(object):
     PathCls = Path
+    IdentCls = ident.Simple
 
     def dumps(self):
         return dumps(self)
@@ -82,13 +84,12 @@ class Node(object):
 
 class Simple(Node):
 
-    def __init__(self, name, dependency=None):
-        self.name = name
+    def __init__(self, id, dependency=None):
+        self.ident = id if isinstance(id, self.IdentCls) else self.IdentCls(id)
         self.dependency = dependency or NilDependency
 
-
     def id(self):
-        return self.name
+        return str(self.ident)
 
     def __repr__(self):
         return self.id()

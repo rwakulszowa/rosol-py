@@ -1,6 +1,7 @@
 from itertools import groupby
 import json
 
+import ident
 import node
 from utils import dumps
 
@@ -29,13 +30,13 @@ class Repository(object):
 
     def get(self, name, version):
         """
-        Returns a VersionedPackage with a given name:version
+        Returns a SimpleVersionedPackage with a given name:version
         or None if doesn't exist
         """
         by_name = self.packages.get(name)
         if by_name:
             by_version = by_name.get(version)
-            return by_version  # VersionedPackage | None
+            return by_version  # SimpleVersionedPackage | None
         else:
             return None
 
@@ -53,8 +54,9 @@ class Repository(object):
             if pkg is not None)
 
 
-class VersionedPackage(object):
+class SimpleVersionedPackage(object):
     NodeCls = node.Simple
+    IdentCls = ident.Simple
 
     def __init__(self, name, version, dependencies):
         self.name = name
@@ -67,17 +69,18 @@ class VersionedPackage(object):
             self.dependencies)
 
     def id(self):
-        return "{}-{}".format(
-            self.name,
-            self.version)
+        return self.IdentCls(
+            "{}-{}".format(
+                self.name,
+                self.version))
 
     def into_node(self, repo):
         """
         Convert into a `Node`
 
         Returns a `node.Simple` with a lazily resolvable `node.Dependency`
-        >>> A1 = VersionedPackage("A", 1, [])
-        >>> B1 = VersionedPackage("B", 1, [Set("A", [1])])
+        >>> A1 = SimpleVersionedPackage("A", 1, [])
+        >>> B1 = SimpleVersionedPackage("B", 1, [Set("A", [1])])
         >>> repo = Repository([A1, B1])
         >>> A1.into_node(repo) == node.Simple("A-1")
         True
@@ -105,7 +108,7 @@ class Dependency(object):
         """
         Returns existing packages from a `repo` matching the precondition
         >>> A1, A2, A3 = [
-        ...     VersionedPackage("A", num, [])
+        ...     SimpleVersionedPackage("A", num, [])
         ...     for num in (1, 2, 3)]
         >>> repo = Repository([A1, A2, A3])
         >>> dep = Set("A", [1, 3])
@@ -121,7 +124,7 @@ class Dependency(object):
     def into_node(self, repo):
         """
         Convert into a `Node`
-        >>> A1 = VersionedPackage("A", 1, [])
+        >>> A1 = SimpleVersionedPackage("A", 1, [])
         >>> repo = Repository([A1])
         >>> dep = Set("A", [1])
         >>> dep.into_node(repo) == node.Or([node.Simple("A-1")])
