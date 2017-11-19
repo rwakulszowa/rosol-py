@@ -1,4 +1,5 @@
 import ident
+import tag
 from utils import flatten
 
 
@@ -7,8 +8,11 @@ class Path(object):
 
     IdentCls = ident.Simple
 
-    def __init__(self, nodes):
+    def __init__(self, nodes, tags=None):
         self.nodes = tuple(nodes)
+        tags = tags or [tag.Empty for _ in range(len(nodes))]
+        self.tags = tuple(tags)
+        assert(len(self.nodes) == len(self.tags))
 
     @classmethod
     def empty(cls):
@@ -16,7 +20,7 @@ class Path(object):
         >>> Path.empty()
         Path: ()
         """
-        return cls(tuple())
+        return cls(tuple(), tuple())
 
     @classmethod
     def chain(cls, subpaths):
@@ -29,7 +33,11 @@ class Path(object):
             path.nodes
             for path in subpaths)
 
-        return Path(nodes)
+        tags = flatten(
+            path.tags
+            for path in subpaths)
+
+        return Path(nodes, tags)
 
     def __eq__(self, other):
         """
@@ -38,7 +46,7 @@ class Path(object):
         >>> Path([1, 2]) == Path([1, 2, 3])
         False
         """
-        return type(self) == type(other) and self.nodes == other.nodes
+        return type(self) == type(other) and (self.nodes, self.tags) == (other.nodes, other.tags)
 
     def __add__(self, other):
         return self.concat(other)
@@ -48,7 +56,9 @@ class Path(object):
         >>> Path([1, 2]).concat(Path([3, 4]))
         Path: (1, 2, 3, 4)
         """
-        return Path(self.nodes + tail.nodes)
+        return Path(
+            self.nodes + tail.nodes,
+            self.tags + tail.tags)
 
     def suffix(self, prefix):
         """
@@ -58,7 +68,9 @@ class Path(object):
         assert(self.length() >= prefix.length())
         cutoff = prefix.length()
         assert(self.nodes[ : cutoff] == prefix.nodes)
-        return Path(self.nodes[cutoff : ]) 
+        return Path(
+            self.nodes[cutoff : ],
+            self.tags[cutoff : ])
 
     def __sub__(self, other):
         return self.suffix(other)
@@ -71,7 +83,9 @@ class Path(object):
         >>> Path([1, 2]).append(3)
         Path: (1, 2, 3)
         """
-        return Path(self.nodes + (element, ))
+        return Path(
+            self.nodes + (element, ),
+            self.tags + (tag.Empty, ))
 
     def solvable(self):
         """
@@ -80,10 +94,34 @@ class Path(object):
         >>> Path([1, 2, 1]).solvable()
         False
         """
-        return not self.IdentCls.are_conflicting(self.nodes)
+        cached = CACHE.get(self)
+        if cached:
+            return cached
+        else:
+            ans = not self.IdentCls.are_conflicting(self.nodes)
+            CACHE.set(self, ans)
+            return ans
 
     def length(self):
         return len(self.nodes)
 
     def has(self, node):
         return node in self.nodes
+
+    def append_tag(self, tag):
+        """
+        >>> path = Path([1], [tag.Empty])
+        >>> path.append_tag(tag.And) == Path([1], [tag.And])
+        True
+        >>> path = Path([1, 2], [tag.Empty, tag.Empty])
+        >>> path.append_tag(tag.Or) == Path([1, 2], [tag.Empty, tag.Or])
+        True
+        """
+        if self.length() is 0:
+            return self
+
+        new_tags = self.tags[:-1] + (self.tags[-1].add(tag), )
+        return Path(
+            self.nodes,
+            new_tags)
+

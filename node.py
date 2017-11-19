@@ -2,6 +2,7 @@ import json
 
 import ident
 from path import Path
+import tag
 from utils import first, flatten, selections, dumps, make_gen
 
 
@@ -48,7 +49,7 @@ class Node(object):
         >>> list(B.paths())
         [Path: (B, A)]
 
-        >>> list(B.paths(Path([A])))  # A present in prefix and dependencies (this test depends on `Path`'s current behavior
+        >>> list(B.paths(Path([A])))  # A present in prefix and dependencies
         []
 
         >>> C = Simple("C")
@@ -165,6 +166,8 @@ class And(Complex):
 
             return Path.chain(elements)
 
+        prefix = prefix.append_tag(tag.And)
+
         subpaths_per_child = [
             child.paths(prefix)
             for child in self.children]
@@ -191,6 +194,8 @@ class Or(Complex):
         >>> list(C._subpaths(Path([D])))
         [Path: (D, A), Path: (D, B)]
         """
+        prefix = prefix.append_tag(tag.Or)
+
         return (
             subpath
             for child in self.children
