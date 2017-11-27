@@ -21,12 +21,20 @@ class Dependency(object):
         return Dependency(
             make_gen(node))
 
+    @staticmethod
+    def tag():
+        return tag.AndOr
+
 
 class NilDependency(Dependency):
 
     @staticmethod
     def resolve():
         return Nil
+
+    @staticmethod
+    def tag():
+        return tag.Empty
 
 
 class Node(object):
@@ -36,7 +44,7 @@ class Node(object):
     def dumps(self):
         return dumps(self)
 
-    def paths(self, prefix=None):
+    def paths(self, prefix=None, trailing_tag=None):
         """ Get all possible paths from self to Nil.
 
         Filters out unsolvable paths, doesn't hang on circular dependencies.
@@ -73,7 +81,7 @@ class Node(object):
 
         return (
             path
-            for path in self._subpaths(prefix)
+            for path in self._subpaths(prefix, trailing_tag)
             if path.solvable())
 
     def __hash__(self):
@@ -100,7 +108,7 @@ class Simple(Node):
             "id": self.id(),
             "dep": self.dependency }
 
-    def _subpaths(self, prefix):
+    def _subpaths(self, prefix, trailing_tag=None):
         """
         Get `self.children`'s subpaths, break on circular dependency
 
@@ -115,9 +123,16 @@ class Simple(Node):
         [Path: (A, B)]
         """
         circular = prefix.has(self)
-        new_prefix = prefix.append(self)
+        new_prefix = prefix.append(
+            self,
+            trailing_tag or tag.Empty)
+        new_trailing_tag = self.dependency.tag()
+        #TODO: check if new_prefix is solvable
 
-        return self.dependency.resolve().paths(new_prefix) if not circular else [new_prefix]
+        if circular:
+            return [new_prefix]
+        else:
+            return self.dependency.resolve().paths(new_prefix, new_trailing_tag)
 
 
 class Complex(Node):
@@ -146,7 +161,7 @@ class And(Complex):
     def operator():
         return " * "
 
-    def _subpaths(self, prefix):
+    def _subpaths(self, prefix, trailing_tag=None):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
@@ -166,10 +181,8 @@ class And(Complex):
 
             return Path.chain(elements)
 
-        prefix = prefix.append_tag(tag.And)
-
         subpaths_per_child = [
-            child.paths(prefix)
+            child.paths(prefix, trailing_tag)
             for child in self.children]
 
         return (
@@ -182,7 +195,7 @@ class Or(Complex):
     def operator():
         return " + "
 
-    def _subpaths(self, prefix):
+    def _subpaths(self, prefix, trailing_tag=None):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
@@ -194,12 +207,10 @@ class Or(Complex):
         >>> list(C._subpaths(Path([D])))
         [Path: (D, A), Path: (D, B)]
         """
-        prefix = prefix.append_tag(tag.Or)
-
         return (
             subpath
             for child in self.children
-            for subpath in child.paths(prefix))
+            for subpath in child.paths(prefix, trailing_tag))
 
 
 class Nil(Node):
@@ -212,5 +223,5 @@ class Nil(Node):
         return None
 
     @staticmethod
-    def paths(prefix):
+    def paths(prefix, trailing_tag=None):
         yield prefix

@@ -78,29 +78,30 @@ class Path(object):
     def __repr__(self):
         return "Path: {}".format(self.nodes)
 
-    def append(self, element):
+
+    def append(self, element, elemTag=None):
         """
         >>> Path([1, 2]).append(3)
         Path: (1, 2, 3)
         """
+        elemTag = elemTag or tag.Empty
         return Path(
             self.nodes + (element, ),
-            self.tags + (tag.Empty, ))
+            self.tags + (elemTag, ))
 
     def solvable(self):
-        """
-        >>> Path([1, 2]).solvable()
-        True
-        >>> Path([1, 2, 1]).solvable()
-        False
-        """
         cached = CACHE.get(self)
         if cached:
             return cached
         else:
-            ans = not self.IdentCls.are_conflicting(self.nodes)
+            ans = not self.IdentCls.are_conflicting(self._idents())
             CACHE.set(self, ans)
             return ans
+    
+    def _idents(self):
+        return [
+            node.ident
+            for node in self.nodes]
 
     def length(self):
         return len(self.nodes)
