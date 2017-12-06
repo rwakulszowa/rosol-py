@@ -19,15 +19,19 @@ def trace(foo):
         return ans
     return inner
 
-def first(it, test):
+def first(it):
     """
     >>> first(
-    ...    [1,2,3],
-    ...    lambda x: x % 2 is 0)
+    ...    x
+    ...    for x in [1,2,3]
+    ...    if x % 2 is 0)
     2
     """
-    return next(
-        el for el in it if test(el))
+    try:
+        return next(it)
+    except StopIteration:
+        return None
+
 
 def selections(sources):
     """
