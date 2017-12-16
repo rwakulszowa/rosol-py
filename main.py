@@ -20,5 +20,5 @@ Root = repo.get("Root", 1)
 
 node = Root.into_node(repo)
 
-for path in node.paths():
+for path in node.resolve().paths:
     print(path)

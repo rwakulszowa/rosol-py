@@ -5,6 +5,9 @@ from path import Path
 import tag
 from utils import first, flatten, selections, dumps, make_gen
 
+#TODO: split into multiple files
+#TODO: leave only simple tests here, move proper tests to a separate file
+
 
 class Dependency(object):
     def __init__(self, data_gen):
@@ -23,6 +26,7 @@ class Dependency(object):
 
     @staticmethod
     def tag():
+        #NOTE: is this still useful?
         return tag.AndOr
 
 
@@ -44,45 +48,43 @@ class Node(object):
     def dumps(self):
         return dumps(self)
 
-    def paths(self, prefix=None, trailing_tag=None):
+    def resolve(self, prefix=None, trailing_tag=None):
         """ Get all possible paths from self to Nil.
 
         Filters out unsolvable paths, doesn't hang on circular dependencies.
-
         >>> A = Simple("A")
-        >>> list(A.paths())
+        >>> list(A.resolve().paths)
         [Path: (A,)]
 
         >>> B = Simple("B", Dependency.make(A))
-        >>> list(B.paths())
+        >>> list(B.resolve().paths)
         [Path: (B, A)]
 
-        >>> list(B.paths(Path([A])))  # A present in prefix and dependencies
-        []
+        >>> B.resolve(Path([A])).is_success()  # A present in prefix and dependencies
+        False
 
         >>> C = Simple("C")
-        >>> node = And([A, C])
-        >>> list(node.paths())
+        >>> AndAC = And([A, C])
+        >>> list(AndAC.resolve().paths)
         [Path: (A, C)]
 
-        >>> list(node.paths(Path([A])))  # A present in prefix
-        []
+        #FIXME
+        >>> #AndAC.resolve(Path([A])).is_success()  # A present in prefix
 
         >>> D = Simple("D")
-        >>> node = Or([C, D])
-        >>> list(node.paths(Path([A])))
+        >>> OrCD = Or([C, D])
+        >>> list(OrCD.resolve(Path([A])).paths)
         [Path: (A, C), Path: (A, D)]
 
-        >>> list(node.paths(Path([A, C])))  # C would cause a conflict, D is fine
+        >>> list(OrCD.resolve(Path([A, C])).paths)  # C would cause a conflict, D is fine
         [Path: (A, C, D)]
         """
-        #TODO: check if prefix is solvable (if it makes sense)
+        #TODO: make this function great again -> it's kinda useless now
         prefix = prefix or self.PathCls.empty()
 
-        return (
-            path
-            for path in self._subpaths(prefix, trailing_tag)
-            if path.solvable())
+        return self._resolve(
+            prefix,
+            trailing_tag)
 
     def __hash__(self):
         return hash(self.id())
@@ -108,32 +110,37 @@ class Simple(Node):
             "id": self.id(),
             "dep": self.dependency }
 
-    def _subpaths(self, prefix, trailing_tag=None):
+    def _resolve(self, prefix, trailing_tag=None):
         """
-        Get `self.children`'s subpaths, break on circular dependency
-
-        This method doesn't filter out unsolvable paths -> it shouldn't
-        be directly called by any method other than `self.paths`
         >>> A = Simple("A")
-        >>> list(A._subpaths(Path.empty()))
+
+        >>> adin = A._resolve(Path.empty())
+        >>> adin.is_success()
+        True
+        >>> list(adin.paths)
         [Path: (A,)]
 
-        >>> B = Simple("B")
-        >>> list(B._subpaths(Path([A])))
-        [Path: (A, B)]
+        >>> dwa = A._resolve(Path([A]))
+        >>> dwa.is_success()
+        False
         """
         circular = prefix.has(self)
+
         new_prefix = prefix.append(
             self,
             trailing_tag or tag.Empty)
+
         new_trailing_tag = self.dependency.tag()
-        #TODO: check if new_prefix is solvable
 
-        if circular:
-            return [new_prefix]
+        if new_prefix.solvable():
+            if circular:
+                return Success([new_prefix])
+            else:
+                ans = self.dependency.resolve().resolve(new_prefix, new_trailing_tag)
+                return ans
         else:
-            return self.dependency.resolve().paths(new_prefix, new_trailing_tag)
-
+            return Fail(new_prefix)
+        
 
 class Complex(Node):
     def __init__(self, children):
@@ -161,56 +168,96 @@ class And(Complex):
     def operator():
         return " * "
 
-    def _subpaths(self, prefix, trailing_tag=None):
+    @staticmethod
+    def _megapath(prefix, suffixes):
+
+        elements = [prefix] + [
+            suffix - prefix
+            for suffix in suffixes]
+
+        return Path.chain(elements)
+
+    def _resolve(self, prefix, trailing_tag=None):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
         >>> C = And([A, B])
-        >>> list(C._subpaths(Path.empty()))
+        >>> D = Simple("D")
+
+        >>> adin = C._resolve(Path.empty())
+        >>> adin.is_success()
+        True
+        >>> list(adin.paths)
         [Path: (A, B)]
 
-        >>> D = Simple("D")
-        >>> list(C._subpaths(Path([D])))
+        >>> dwa = C._resolve(Path([D]))
+        >>> dwa.is_success()
+        True
+        >>> list(dwa.paths)
         [Path: (D, A, B)]
-
         """
-        def megapath(prefix, suffixes):
-            elements = [prefix] + [
-                suffix - prefix
-                for suffix in suffixes]
-
-            return Path.chain(elements)
-
-        subpaths_per_child = [
-            child.paths(prefix, trailing_tag)
+        results_per_child = [
+            child.resolve(prefix, trailing_tag)
             for child in self.children]
 
-        return (
-            megapath(prefix, selection)
-            for selection in selections(subpaths_per_child))
+        paths_per_child = [
+            result.paths if result.is_success() else []
+            for result in results_per_child]
+
+        megapaths = [
+            self._megapath(
+                prefix,
+                selection)
+            for selection in selections(paths_per_child)]
+
+        valid_megapaths = [
+            path
+            for path in megapaths
+            if path.solvable()]
+ 
+        return Result.make(
+            valid_megapaths,
+            self)
 
 
 class Or(Complex):
     @staticmethod
     def operator():
         return " + "
-
-    def _subpaths(self, prefix, trailing_tag=None):
+    
+    def _resolve(self, prefix, trailing_tag=None):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
         >>> C = Or([A, B])
-        >>> list(C._subpaths(Path.empty()))
+        >>> D = Simple("D")
+
+        >>> adin = C._resolve(Path.empty())
+        >>> adin.is_success()
+        True
+        >>> list(adin.paths)
         [Path: (A,), Path: (B,)]
 
-        >>> D = Simple("D")
-        >>> list(C._subpaths(Path([D])))
+        >>> dwa = C._resolve(Path([D]))
+        >>> dwa.is_success()
+        True
+        >>> list(dwa.paths)
         [Path: (D, A), Path: (D, B)]
         """
-        return (
-            subpath
-            for child in self.children
-            for subpath in child.paths(prefix, trailing_tag))
+        subresults = (
+            child.resolve(
+                prefix,
+                trailing_tag)
+            for child in self.children)
+
+        subpaths = flatten([
+            result.paths
+            for result in subresults
+            if result.is_success()])
+
+        return Result.make(
+            subpaths,
+            self)
 
 
 class Nil(Node):
@@ -222,6 +269,60 @@ class Nil(Node):
     def to_json():
         return None
 
-    @staticmethod
-    def paths(prefix, trailing_tag=None):
-        yield prefix
+    @classmethod
+    def _resolve(cls, prefix, trailing_tag=None):
+        return Success([prefix])
+
+    @classmethod
+    def resolve(cls, prefix=None, trailing_tag=None):
+        #FIXME: just instantiate Nil nodes as well
+        prefix = prefix or Path.empty()
+        return cls._resolve(prefix, trailing_tag)
+
+
+class Result(object):
+
+    @classmethod
+    def is_success(cls):
+        return cls is Success
+
+    @classmethod
+    def make(cls, paths, context):
+        paths = list(paths)  # FIXME: use generators
+        
+        if len(paths) is 0:
+            return Fail(context)
+        else:
+            return Success(paths)
+
+
+class Success(Result):
+    def __init__(self, paths):
+        assert(
+            all(
+                isinstance(path, Path)
+                for path in paths))
+        self.paths = paths
+
+    def __repr__(self):
+        return "{}: {}".format(
+            self.__class__.__name__,
+            self.paths)
+
+    def __eq__(self, other):
+        return type(self) is type(other) and self.paths == other.paths
+
+
+class Fail(Result):
+
+    def __init__(self, reason):
+        self.reason = reason
+    
+    def __repr__(self):
+        return "{}: {}".format(
+            self.__class__.__name__,
+            self.reason)
+    
+    def __eq__(self, other):
+        return type(self) is type(other) and self.reason == other.reason
+

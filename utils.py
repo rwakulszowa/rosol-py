@@ -43,9 +43,14 @@ def selections(sources):
 
     >>> selections([[1, 2], [3, 4]])
     [[1, 3], [1, 4], [2, 3], [2, 4]]
+
+    >>> selections([[1], []])
+    [[]]
     """
     #FIXME: generators
     if len(sources) is 0:
+        return [[]]
+    if any(len(sub) is 0 for sub in sources):
         return [[]]
     else:
         head, tail = sources[0], sources[1:]
