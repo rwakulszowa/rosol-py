@@ -93,9 +93,11 @@ class SimpleVersionedPackage(object):
                 dep.into_node(repo)
                 for dep in self.dependencies)
 
+        dependency = node.Dependency(make_dependency_node()) if len(self.dependencies) is not 0 else node.NilDependency
+
         return self.NodeCls(
             self.id(),
-            node.Dependency(make_dependency_node()))
+            dependency)
 
 
 class Dependency(object):
