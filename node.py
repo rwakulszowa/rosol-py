@@ -3,7 +3,7 @@ import json
 import ident
 from path import Path
 import tag
-from utils import first, flatten, selections, dumps, make_gen
+from utils import first, flatten, selections, dumps, make_gen, split
 
 #TODO: split into multiple files
 #TODO: leave only simple tests here, move proper tests to a separate file
@@ -68,8 +68,8 @@ class Node(object):
         >>> list(AndAC.resolve().paths)
         [Path: (A, C)]
 
-        #FIXME
-        >>> #AndAC.resolve(Path([A])).is_success()  # A present in prefix
+        >>> AndAC.resolve(Path([A])).is_success()  # A present in prefix
+        False
 
         >>> D = Simple("D")
         >>> OrCD = Or([C, D])
@@ -183,6 +183,7 @@ class And(Complex):
         >>> B = Simple("B")
         >>> C = And([A, B])
         >>> D = Simple("D")
+        >>> E = Simple("E", Dependency.make(A))
 
         >>> adin = C._resolve(Path.empty())
         >>> adin.is_success()
@@ -195,13 +196,26 @@ class And(Complex):
         True
         >>> list(dwa.paths)
         [Path: (D, A, B)]
+
+        >>> tri = C._resolve(Path([A]))
+        >>> tri.is_success()
+        False
         """
         results_per_child = [
             child.resolve(prefix, trailing_tag)
             for child in self.children]
 
+        successes, failures = split(
+            results_per_child,
+            lambda x: x.is_success())
+
+        successes, failures = list(successes), list(failures)
+
+        if len(failures) is not 0:
+            return Fail(failures)
+
         paths_per_child = [
-            result.paths if result.is_success() else []
+            result.paths
             for result in results_per_child]
 
         megapaths = [

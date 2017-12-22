@@ -74,3 +74,9 @@ def make_gen(value):
     """
     #FIXME: there must be a better way to do this
     yield value
+
+
+def split(seq, key):
+    positive = (el for el in seq if key(el))
+    negative = (el for el in seq if not key(el))
+    return positive, negative
