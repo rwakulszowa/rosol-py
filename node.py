@@ -137,10 +137,12 @@ class Simple(Node):
                 return Success([new_prefix])
             else:
                 ans = self.dependency.resolve().resolve(new_prefix, new_trailing_tag)
-                return ans
+                return ans.update_reason(self, prefix)
         else:
-            return Fail(new_prefix)
-        
+            return Fail(self, prefix)
+
+        #TODO: cache
+
 
 class Complex(Node):
     def __init__(self, children):
@@ -212,11 +214,12 @@ class And(Complex):
         successes, failures = list(successes), list(failures)
 
         if len(failures) is not 0:
-            return Fail(failures)
+            # If any subpath fails, just return the first failure
+            return failures[0]
 
         paths_per_child = [
             result.paths
-            for result in results_per_child]
+            for result in successes]
 
         megapaths = [
             self._megapath(
@@ -224,14 +227,17 @@ class And(Complex):
                 selection)
             for selection in selections(paths_per_child)]
 
-        valid_megapaths = [
-            path
-            for path in megapaths
-            if path.solvable()]
- 
+        solvable_megapaths, failing_megapaths = split(
+            megapaths,
+            lambda x: x.solvable())
+        #TODO: cache the unsolvable ones
+
+        solvable_megapaths, failing_megapaths = list(solvable_megapaths), list(failing_megapaths)
+
         return Result.make(
-            valid_megapaths,
-            self)
+            solvable_megapaths,
+            self,
+            prefix)
 
 
 class Or(Complex):
@@ -271,7 +277,8 @@ class Or(Complex):
 
         return Result.make(
             subpaths,
-            self)
+            self,
+            prefix)
 
 
 class Nil(Node):
@@ -301,11 +308,11 @@ class Result(object):
         return cls is Success
 
     @classmethod
-    def make(cls, paths, context):
+    def make(cls, paths, node, prefix):
         paths = list(paths)  # FIXME: use generators
         
         if len(paths) is 0:
-            return Fail(context)
+            return Fail(node, prefix)
         else:
             return Success(paths)
 
@@ -326,17 +333,24 @@ class Success(Result):
     def __eq__(self, other):
         return type(self) is type(other) and self.paths == other.paths
 
+    def update_reason(self, node, prefix):
+        return self
+
 
 class Fail(Result):
 
-    def __init__(self, reason):
-        self.reason = reason
+    def __init__(self, node, prefix):
+        self.node = node
+        self.prefix = prefix
     
     def __repr__(self):
-        return "{}: {}".format(
+        return "{}: {} > {}".format(
             self.__class__.__name__,
-            self.reason)
+            self.node,
+            self.prefix)
     
     def __eq__(self, other):
-        return type(self) is type(other) and self.reason == other.reason
+        return type(self) is type(other) and (self.node, self.prefix) == (other.node, other.prefix)
 
+    def update_reason(self, node, prefix):
+        return Fail(node, prefix)
