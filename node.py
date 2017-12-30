@@ -3,7 +3,7 @@ import json
 import ident
 from path import Path
 import tag
-from utils import first, flatten, selections, dumps, make_gen, split
+from utils import *
 
 #TODO: split into multiple files
 #TODO: leave only simple tests here, move proper tests to a separate file
@@ -132,17 +132,17 @@ class Simple(Node):
 
         new_trailing_tag = self.dependency.tag()
 
-        if new_prefix.solvable():
+        if not new_prefix.solvable():
+            # The conflict must be caused by self
+            causes = { self }
+            return Result([], causes)  # Failure
+        else:
             if circular:
-                return Success([new_prefix])
+                return Success(self, [new_prefix], set())  # Success with no causes
             else:
                 ans = self.dependency.resolve().resolve(new_prefix, new_trailing_tag)
-                return ans.update_reason(self, prefix)
-        else:
-            return Fail(self, prefix)
-
-        #TODO: cache
-
+                new_causes = ans.causes - { self }
+                return Result(ans.paths, new_causes)
 
 class Complex(Node):
     def __init__(self, children):
@@ -207,6 +207,8 @@ class And(Complex):
             child.resolve(prefix, trailing_tag)
             for child in self.children]
 
+        causes = Result.concat_causes(results_per_child)
+
         successes, failures = split(
             results_per_child,
             lambda x: x.is_success())
@@ -214,12 +216,14 @@ class And(Complex):
         successes, failures = list(successes), list(failures)
 
         if len(failures) is not 0:
-            # If any subpath fails, just return the first failure
-            return failures[0]
+            # If any subpath failed, fail early
+            return Result(
+                [],
+                causes)
 
         paths_per_child = [
             result.paths
-            for result in successes]
+            for result in results_per_child]
 
         megapaths = [
             self._megapath(
@@ -227,17 +231,12 @@ class And(Complex):
                 selection)
             for selection in selections(paths_per_child)]
 
-        solvable_megapaths, failing_megapaths = split(
-            megapaths,
-            lambda x: x.solvable())
-        #TODO: cache the unsolvable ones
-
-        solvable_megapaths, failing_megapaths = list(solvable_megapaths), list(failing_megapaths)
-
-        return Result.make(
-            solvable_megapaths,
-            self,
-            prefix)
+        return Result(
+            [
+                megapath
+                for megapath in megapaths
+                if megapath.solvable()],
+            causes)
 
 
 class Or(Complex):
@@ -264,21 +263,19 @@ class Or(Complex):
         >>> list(dwa.paths)
         [Path: (D, A), Path: (D, B)]
         """
-        subresults = (
+        subresults = list(
             child.resolve(
                 prefix,
                 trailing_tag)
             for child in self.children)
+        
+        causes = Result.concat_causes(subresults)
 
-        subpaths = flatten([
-            result.paths
-            for result in subresults
-            if result.is_success()])
-
-        return Result.make(
-            subpaths,
-            self,
-            prefix)
+        return Result(
+            flatten([
+                result.paths
+                for result in subresults]),
+            causes)
 
 
 class Nil(Node):
@@ -292,7 +289,7 @@ class Nil(Node):
 
     @classmethod
     def _resolve(cls, prefix, trailing_tag=None):
-        return Success([prefix])
+        return Result([prefix], set())
 
     @classmethod
     def resolve(cls, prefix=None, trailing_tag=None):
@@ -303,54 +300,23 @@ class Nil(Node):
 
 class Result(object):
 
-    @classmethod
-    def is_success(cls):
-        return cls is Success
+    def __init__(self, paths, causes):
+        self.paths = list(paths)  #FIXME: use generators
+        self.causes = causes
 
-    @classmethod
-    def make(cls, paths, node, prefix):
-        paths = list(paths)  # FIXME: use generators
-        
-        if len(paths) is 0:
-            return Fail(node, prefix)
-        else:
-            return Success(paths)
-
-
-class Success(Result):
-    def __init__(self, paths):
-        assert(
-            all(
-                isinstance(path, Path)
-                for path in paths))
-        self.paths = paths
+    def is_success(self):
+        return len(self.paths) is not 0
 
     def __repr__(self):
-        return "{}: {}".format(
+        return "{}: {} - {}".format(
             self.__class__.__name__,
-            self.paths)
-
-    def __eq__(self, other):
-        return type(self) is type(other) and self.paths == other.paths
-
-    def update_reason(self, node, prefix):
-        return self
-
-
-class Fail(Result):
-
-    def __init__(self, node, prefix):
-        self.node = node
-        self.prefix = prefix
+            self.paths,
+            self.causes)
     
-    def __repr__(self):
-        return "{}: {} > {}".format(
-            self.__class__.__name__,
-            self.node,
-            self.prefix)
-    
-    def __eq__(self, other):
-        return type(self) is type(other) and (self.node, self.prefix) == (other.node, other.prefix)
+    @staticmethod
+    def concat_causes(results):
+        ans = set()
+        for result in results:
+            ans |= result.causes
+        return ans
 
-    def update_reason(self, node, prefix):
-        return Fail(node, prefix)
