@@ -1,6 +1,7 @@
 import json
 
 import package
+from cache import instance as CACHE
 
 
 repo = package.Repository([
@@ -23,3 +24,6 @@ node = Root.into_node(repo)
 
 for path in node.resolve().paths:
     print(path)
+
+print(CACHE)
+print(CACHE.info())

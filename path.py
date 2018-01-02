@@ -1,6 +1,7 @@
 import ident
 import tag
 from utils import first, flatten
+from cache import instance as CACHE
 
 
 class Path(object):
@@ -112,9 +113,11 @@ class Path(object):
             self.tags + (elemTag, ))
 
     def solvable(self):
-        #TODO: should return Yes/No/Maybe
-        #FIXME: cache lookup
-        return not self.IdentCls.are_conflicting(self._idents())
+        cached = CACHE.get(self.nodes)
+        if cached:
+            return cached
+        else:
+            return not self.IdentCls.are_conflicting(self._idents())
 
     def _idents(self):
         return [

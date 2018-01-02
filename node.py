@@ -4,6 +4,7 @@ import ident
 from path import Path
 import tag
 from utils import *
+from cache import instance as CACHE
 
 #TODO: split into multiple files
 #TODO: leave only simple tests here, move proper tests to a separate file
@@ -134,6 +135,8 @@ class Simple(Node):
 
         if not new_prefix.solvable():
             # The conflict must be caused by self
+            # NOTE: this branch doesn't cache failures,
+            # because it is either trivial or already cached
             causes = { self }
             return Result([], causes)  # Failure
         else:
@@ -142,7 +145,10 @@ class Simple(Node):
             else:
                 ans = self.dependency.resolve().resolve(new_prefix, new_trailing_tag)
                 new_causes = ans.causes - { self }
+                if not ans.is_success():
+                    CACHE.set(ans.causes | { self })
                 return Result(ans.paths, new_causes)
+
 
 class Complex(Node):
     def __init__(self, children):
