@@ -1,4 +1,4 @@
-import utils
+from rosol import utils
 
 
 class Cache(object):
@@ -8,6 +8,14 @@ class Cache(object):
         self.misses = 0
 
     def get(self, key):
+        """
+        >>> cache = Cache()
+        >>> cache.db.add(frozenset([1,2]))
+        >>> cache.get([1])
+        False
+        >>> cache.get([1,2,3])
+        True
+        """
         key = frozenset(key)
         ans = self._check(key)
 
@@ -28,7 +36,6 @@ class Cache(object):
             check is True
             for check in superset_check)
             
-
     def set(self, key):
         key = frozenset(key)
         self.db.add(key)

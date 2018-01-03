@@ -1,7 +1,7 @@
-import ident
-from path import Path
-from utils import *
-from cache import instance as CACHE
+from rosol import ident
+from rosol.path import Path
+from rosol.utils import *
+from rosol.cache import instance as CACHE
 
 #TODO: split into multiple files
 #TODO: leave only simple tests here, move proper tests to a separate file

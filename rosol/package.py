@@ -1,9 +1,8 @@
 from itertools import groupby
 import json
 
-import ident
-import node
-from utils import dumps
+from rosol import ident, node
+from rosol.utils import dumps
 
 
 class Repository(object):

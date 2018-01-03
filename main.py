@@ -1,7 +1,7 @@
 import json
 
-import package
-from cache import instance as CACHE
+from rosol import package
+from rosol.cache import instance as CACHE
 
 
 repo = package.Repository([

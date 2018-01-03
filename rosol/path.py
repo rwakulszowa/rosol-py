@@ -1,6 +1,6 @@
-import ident
-from utils import first, flatten
-from cache import instance as CACHE
+from rosol import ident
+from rosol.utils import first, flatten
+from rosol.cache import instance as CACHE
 
 
 class Path(object):
