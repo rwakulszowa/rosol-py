@@ -1,8 +1,5 @@
-import json
-
 import ident
 from path import Path
-import tag
 from utils import *
 from cache import instance as CACHE
 
@@ -25,21 +22,12 @@ class Dependency(object):
         return Dependency(
             make_gen(node))
 
-    @staticmethod
-    def tag():
-        #NOTE: is this still useful?
-        return tag.AndOr
-
 
 class NilDependency(Dependency):
 
     @staticmethod
     def resolve():
         return Nil
-
-    @staticmethod
-    def tag():
-        return tag.Empty
 
 
 class Node(object):
@@ -49,7 +37,7 @@ class Node(object):
     def dumps(self):
         return dumps(self)
 
-    def resolve(self, prefix=None, trailing_tag=None):
+    def resolve(self, prefix=None):
         """ Get all possible paths from self to Nil.
 
         Filters out unsolvable paths, doesn't hang on circular dependencies.
@@ -83,9 +71,7 @@ class Node(object):
         #TODO: make this function great again -> it's kinda useless now
         prefix = prefix or self.PathCls.empty()
 
-        return self._resolve(
-            prefix,
-            trailing_tag)
+        return self._resolve(prefix)
 
     def __hash__(self):
         return hash(self.id())
@@ -111,7 +97,7 @@ class Simple(Node):
             "id": self.id(),
             "dep": self.dependency }
 
-    def _resolve(self, prefix, trailing_tag=None):
+    def _resolve(self, prefix):
         """
         >>> A = Simple("A")
 
@@ -126,12 +112,7 @@ class Simple(Node):
         False
         """
         circular = prefix.has(self)
-
-        new_prefix = prefix.append(
-            self,
-            trailing_tag or tag.Empty)
-
-        new_trailing_tag = self.dependency.tag()
+        new_prefix = prefix.append(self)
 
         if not new_prefix.solvable():
             # The conflict must be caused by self
@@ -143,7 +124,7 @@ class Simple(Node):
             if circular:
                 return Success(self, [new_prefix], set())  # Success with no causes
             else:
-                ans = self.dependency.resolve().resolve(new_prefix, new_trailing_tag)
+                ans = self.dependency.resolve().resolve(new_prefix)
                 new_causes = ans.causes - { self }
                 if not ans.is_success():
                     CACHE.set(ans.causes | { self })
@@ -185,7 +166,7 @@ class And(Complex):
 
         return Path.chain(elements)
 
-    def _resolve(self, prefix, trailing_tag=None):
+    def _resolve(self, prefix):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
@@ -210,7 +191,7 @@ class And(Complex):
         False
         """
         results_per_child = [
-            child.resolve(prefix, trailing_tag)
+            child.resolve(prefix)
             for child in self.children]
 
         causes = Result.concat_causes(results_per_child)
@@ -250,7 +231,7 @@ class Or(Complex):
     def operator():
         return " + "
     
-    def _resolve(self, prefix, trailing_tag=None):
+    def _resolve(self, prefix):
         """
         >>> A = Simple("A")
         >>> B = Simple("B")
@@ -270,9 +251,7 @@ class Or(Complex):
         [Path: (D, A), Path: (D, B)]
         """
         subresults = list(
-            child.resolve(
-                prefix,
-                trailing_tag)
+            child.resolve(prefix)
             for child in self.children)
         
         causes = Result.concat_causes(subresults)
@@ -294,14 +273,14 @@ class Nil(Node):
         return None
 
     @classmethod
-    def _resolve(cls, prefix, trailing_tag=None):
+    def _resolve(cls, prefix):
         return Result([prefix], set())
 
     @classmethod
-    def resolve(cls, prefix=None, trailing_tag=None):
+    def resolve(cls, prefix=None):
         #FIXME: just instantiate Nil nodes as well
         prefix = prefix or Path.empty()
-        return cls._resolve(prefix, trailing_tag)
+        return cls._resolve(prefix)
 
 
 class Result(object):

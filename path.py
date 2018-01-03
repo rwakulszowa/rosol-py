@@ -1,5 +1,4 @@
 import ident
-import tag
 from utils import first, flatten
 from cache import instance as CACHE
 
@@ -9,20 +8,8 @@ class Path(object):
 
     IdentCls = ident.Simple
 
-    def __init__(self, nodes, tags=None):
+    def __init__(self, nodes):
         self.nodes = tuple(nodes)
-        tags = tags or [tag.Empty for _ in range(len(nodes))]
-        self.tags = tuple(tags)
-        assert(len(self.nodes) == len(self.tags))
-
-    def as_list(self):
-        """
-        >>> path = Path([1, 2, 3], ["TagA", "TagB", "TagC"])
-        >>> path.as_list()
-        [(1, 'TagA'), (2, 'TagB'), (3, 'TagC')]
-        """
-        assert(len(self.nodes) == len(self.tags))
-        return list(zip(self.nodes, self.tags))
 
     @classmethod
     def empty(cls):
@@ -30,7 +17,7 @@ class Path(object):
         >>> Path.empty()
         Path: ()
         """
-        return cls(tuple(), tuple())
+        return cls(tuple())
 
     @classmethod
     def chain(cls, subpaths):
@@ -43,11 +30,7 @@ class Path(object):
             path.nodes
             for path in subpaths)
 
-        tags = flatten(
-            path.tags
-            for path in subpaths)
-
-        return Path(nodes, tags)
+        return Path(nodes)
 
     def __eq__(self, other):
         """
@@ -56,7 +39,7 @@ class Path(object):
         >>> Path([1, 2]) == Path([1, 2, 3])
         False
         """
-        return type(self) == type(other) and (self.nodes, self.tags) == (other.nodes, other.tags)
+        return type(self) == type(other) and self.nodes == other.nodes
 
     def slice(self, i, j):
         """
@@ -67,9 +50,7 @@ class Path(object):
         assert(i <= self.length())
         assert(j <= self.length())
         assert(i <= j)
-        return Path(
-            self.nodes[i:j],
-            self.tags[i:j])
+        return Path(self.nodes[i:j])
 
     def __add__(self, other):
         return self.concat(other)
@@ -79,9 +60,7 @@ class Path(object):
         >>> Path([1, 2]).concat(Path([3, 4]))
         Path: (1, 2, 3, 4)
         """
-        return Path(
-            self.nodes + tail.nodes,
-            self.tags + tail.tags)
+        return Path(self.nodes + tail.nodes)
 
     def suffix(self, prefix):
         """
@@ -100,17 +79,15 @@ class Path(object):
         return "Path: {}".format(self.nodes)
 
     def __hash__(self):
-        return hash((self.nodes, self.tags))
+        return hash(self.nodes)
 
-    def append(self, element, elemTag=None):
+    def append(self, element):
         """
         >>> Path([1, 2]).append(3)
         Path: (1, 2, 3)
         """
-        elemTag = elemTag or tag.Empty
         return Path(
-            self.nodes + (element, ),
-            self.tags + (elemTag, ))
+            self.nodes + (element, ))
 
     def solvable(self):
         cached = CACHE.get(self.nodes)
@@ -130,19 +107,3 @@ class Path(object):
     def has(self, node):
         return node in self.nodes
 
-    def append_tag(self, tag):
-        """
-        >>> path = Path([1], [tag.Empty])
-        >>> path.append_tag(tag.And) == Path([1], [tag.And])
-        True
-        >>> path = Path([1, 2], [tag.Empty, tag.Empty])
-        >>> path.append_tag(tag.Or) == Path([1, 2], [tag.Empty, tag.Or])
-        True
-        """
-        if self.length() is 0:
-            return self
-
-        new_tags = self.tags[:-1] + (self.tags[-1].add(tag), )
-        return Path(
-            self.nodes,
-            new_tags)

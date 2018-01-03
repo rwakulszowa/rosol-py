@@ -1,4 +1,3 @@
-import tag
 import utils
 
 
@@ -25,7 +24,7 @@ class Cache(object):
             key.issuperset(stored)
             for stored in self.db)
 
-        return utils.first(
+        return any(
             check is True
             for check in superset_check)
             
