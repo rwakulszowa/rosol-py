@@ -49,6 +49,11 @@ class Cache(object):
     def __repr__(self):
         return "Cache: {}".format(self.db)
 
+    def clear(self):
+        self.db = set()
+        self.hits = 0
+        self.misses = 0
+
 
 instance = Cache()
 
