@@ -18,6 +18,10 @@ class Repository(object):
                 lambda pkg: pkg.version)
 
         #TODO: store by_version as a sorted list instead?
+        packages = sorted(
+            packages,
+            key=lambda pkg: (pkg.name, pkg.version))
+
         self.packages = {
             name: {
                 version: next(grp2)
