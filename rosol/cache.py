@@ -39,29 +39,28 @@ class Cache(BaseCache):
         >>> cache = Cache()
         >>> cache.db.add(frozenset([1,2]))
         >>> cache.get([1])
-        False
+
         >>> cache.get([1,2,3])
-        True
+        frozenset({1, 2})
         """
         key = frozenset(key)
-        ans = self._check(key)
+        match = self._match(key)
 
-        if ans is True:
+        if match:
             self.hits += 1
         else:
             self.misses += 1
 
-        return ans
+        return match
 
-    def _check(self, key):
+    def _match(self, key):
         #FIXME: this is very naive, obviously
-        superset_check = (
-            key.issuperset(stored)
-            for stored in self.db)
+        supersets = (
+            stored
+            for stored in self.db
+            if key.issuperset(stored))
 
-        return any(
-            check is True
-            for check in superset_check)
+        return utils.first(supersets)
 
     def set(self, key):
         key = frozenset(key)

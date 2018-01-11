@@ -1,5 +1,5 @@
 from rosol import ident
-from rosol.path import Path
+from rosol.path import *
 from rosol.utils import *
 from rosol.cache import instance as CACHE
 
@@ -41,6 +41,7 @@ class Node(object):
         """ Get all possible paths from self to Nil.
 
         Filters out unsolvable paths, doesn't hang on circular dependencies.
+        >>> CACHE.clear()
         >>> A = Simple("A")
         >>> list(A.resolve().paths)
         [Path: (A,)]
@@ -99,6 +100,7 @@ class Simple(Node):
 
     def _resolve(self, prefix):
         """
+        >>> CACHE.clear()
         >>> A = Simple("A")
 
         >>> adin = A._resolve(Path.empty())
@@ -113,12 +115,12 @@ class Simple(Node):
         """
         circular = prefix.has(self)
         new_prefix = prefix.append(self)
+        solvability = new_prefix.solvability()
 
-        if not new_prefix.solvable():
-            # The conflict must be caused by self
+        if not solvability.is_ok:
             # NOTE: this branch doesn't cache failures,
             # because it is either trivial or already cached
-            causes = { self }
+            causes = self._causes(solvability)
             return Result([], causes)  # Failure
         else:
             if circular:
@@ -129,6 +131,13 @@ class Simple(Node):
                 if not ans.is_success():
                     CACHE.set(ans.causes | { self })
                 return Result(ans.paths, new_causes)
+
+    def _causes(self, solvability):
+        assert(not solvability.is_ok)
+        if isinstance(solvability, Cached):
+            return solvability.reason - { self }
+        else:
+            return set()
 
 
 class Complex(Node):
@@ -168,6 +177,7 @@ class And(Complex):
 
     def _resolve(self, prefix):
         """
+        >>> CACHE.clear()
         >>> A = Simple("A")
         >>> B = Simple("B")
         >>> C = And([A, B])
@@ -222,7 +232,7 @@ class And(Complex):
             [
                 megapath
                 for megapath in megapaths
-                if megapath.solvable()],
+                if megapath.solvability().is_ok],
             causes)
 
 
@@ -233,6 +243,7 @@ class Or(Complex):
     
     def _resolve(self, prefix):
         """
+        >>> CACHE.clear()
         >>> A = Simple("A")
         >>> B = Simple("B")
         >>> C = Or([A, B])
