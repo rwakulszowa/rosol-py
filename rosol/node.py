@@ -122,7 +122,7 @@ class Simple(Node):
             return Result([], causes)  # Failure
         else:
             if circular:
-                return Success(self, [new_prefix], set())  # Success with no causes
+                return Result([new_prefix], set())  # Success with no causes
             else:
                 ans = self.dependency.resolve().resolve(new_prefix)
                 new_causes = ans.causes - { self }

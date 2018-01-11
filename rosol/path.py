@@ -92,7 +92,7 @@ class Path(object):
     def solvable(self):
         cached = CACHE.get(self.nodes)
         if cached:
-            return cached
+            return False
         else:
             return not self.IdentCls.are_conflicting(self._idents())
 
