@@ -1,11 +1,38 @@
 from rosol import utils
 
 
-class Cache(object):
+class BaseCache(object):
+
     def __init__(self):
         self.db = set()
         self.hits = 0
         self.misses = 0
+
+    def __repr__(self):
+        return "Cache: {}".format(self.db)
+
+    def clear(self):
+        self.db = set()
+        self.hits = 0
+        self.misses = 0
+
+    def info(self):
+        return {
+            "hits": self.hits,
+            "misses": self.misses,
+            "keys": len(self.db) }
+
+
+class NoopCache(BaseCache):
+
+    def get(self, key):
+        self.misses += 1
+
+    def set(self, key):
+        pass
+
+
+class Cache(BaseCache):
 
     def get(self, key):
         """
@@ -35,24 +62,10 @@ class Cache(object):
         return any(
             check is True
             for check in superset_check)
-            
+
     def set(self, key):
         key = frozenset(key)
         self.db.add(key)
-
-    def info(self):
-        return {
-            "hits": self.hits,
-            "misses": self.misses,
-            "keys": len(self.db) }
-
-    def __repr__(self):
-        return "Cache: {}".format(self.db)
-
-    def clear(self):
-        self.db = set()
-        self.hits = 0
-        self.misses = 0
 
 
 instance = Cache()
