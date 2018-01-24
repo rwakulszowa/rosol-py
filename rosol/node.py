@@ -2,6 +2,7 @@ from rosol import ident
 from rosol.path import *
 from rosol.utils import *
 from rosol.cache import instance as CACHE
+from rosol.cause import Cause
 
 #TODO: split into multiple files
 #TODO: leave only simple tests here, move proper tests to a separate file
@@ -120,24 +121,31 @@ class Simple(Node):
         if not solvability.is_ok:
             # NOTE: this branch doesn't cache failures,
             # because it is either trivial or already cached
-            causes = self._causes(solvability)
-            return Result([], causes)  # Failure
+            cause = self._cause(solvability)
+            return Result.failure(cause)
         else:
             if circular:
-                return Result([new_prefix], set())  # Success with no causes
+                return Result([new_prefix])
             else:
                 ans = self.dependency.resolve().resolve(new_prefix)
-                new_causes = ans.causes - { self }
-                if not ans.is_success():
-                    CACHE.set(ans.causes | { self })
-                return Result(ans.paths, new_causes)
+                self._handle_caching(ans)
+                new_cause = ans.cause.above(self)
+                return Result(ans.paths, new_cause)
 
-    def _causes(self, solvability):
+    def _cause(self, solvability):
         assert(not solvability.is_ok)
         if isinstance(solvability, Cached):
-            return solvability.reason - { self }
+            cause = solvability.cause
+            return cause.above(self)
         else:
-            return set()
+            return Cause.empty()
+
+    def _handle_caching(self, result):
+        if result.is_success():
+            pass
+        else:
+            cause = result.cause.add(self)
+            CACHE.set(cause.nodes)
 
 
 class Complex(Node):
@@ -204,7 +212,7 @@ class And(Complex):
             child.resolve(prefix)
             for child in self.children]
 
-        causes = Result.concat_causes(results_per_child)
+        cause = Result.concat_cause(results_per_child)
 
         successes, failures = split(
             results_per_child,
@@ -216,7 +224,7 @@ class And(Complex):
             # If any subpath failed, fail early
             return Result(
                 [],
-                causes)
+                cause)
 
         paths_per_child = [
             result.paths
@@ -233,7 +241,7 @@ class And(Complex):
                 megapath
                 for megapath in megapaths
                 if megapath.solvability().is_ok],
-            causes)
+            cause)
 
 
 class Or(Complex):
@@ -265,13 +273,13 @@ class Or(Complex):
             child.resolve(prefix)
             for child in self.children)
         
-        causes = Result.concat_causes(subresults)
+        cause = Result.concat_cause(subresults)
 
         return Result(
             flatten([
                 result.paths
                 for result in subresults]),
-            causes)
+            cause)
 
 
 class Nil(Node):
@@ -285,7 +293,7 @@ class Nil(Node):
 
     @classmethod
     def _resolve(cls, prefix):
-        return Result([prefix], set())
+        return Result([prefix])
 
     @classmethod
     def resolve(cls, prefix=None):
@@ -296,9 +304,13 @@ class Nil(Node):
 
 class Result(object):
 
-    def __init__(self, paths, causes):
+    def __init__(self, paths, cause=None):
         self.paths = list(paths)  #FIXME: use generators
-        self.causes = causes
+        self.cause = cause or Cause.empty()
+
+    @classmethod
+    def failure(cls, cause):
+        return cls([], cause)
 
     def is_success(self):
         return len(self.paths) is not 0
@@ -307,12 +319,12 @@ class Result(object):
         return "{}: {} - {}".format(
             self.__class__.__name__,
             self.paths,
-            self.causes)
+            self.cause)
     
     @staticmethod
-    def concat_causes(results):
-        ans = set()
+    def concat_cause(results):
+        ans = []
         for result in results:
-            ans |= result.causes
-        return ans
+            ans += list(result.cause.nodes)
+        return Cause(ans)
 

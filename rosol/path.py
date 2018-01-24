@@ -1,6 +1,7 @@
 from rosol import ident
 from rosol.utils import first, flatten
 from rosol.cache import instance as CACHE
+from rosol.cause import Cause
 
 
 class Solvability(object):
@@ -16,8 +17,8 @@ class Fail(Solvability):
 
 
 class Cached(Fail):
-    def __init__(self, reason):
-        self.reason = reason
+    def __init__(self, cause):
+        self.cause = cause
 
 
 class Conflict(Fail):
@@ -110,12 +111,16 @@ class Path(object):
         return Path(
             self.nodes + (element, ))
 
+    #TODO: move to node
     def solvability(self):
         cached = CACHE.get(self.nodes)
         if cached:
-            # reason is a common subset of key and a cached conflict
-            reason = cached & frozenset(self.nodes)
-            return Cached(reason)
+            # cause is a common subset of key and a cached conflict
+            cause = Cause(
+                node
+                for node in self.nodes
+                if node in cached)
+            return Cached(cause)
         else:
             has_conflict = self.IdentCls.are_conflicting(self._idents())
             if has_conflict:
